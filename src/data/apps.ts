@@ -9,14 +9,14 @@ export interface FirebaseAppConfig {
 
 export const firebaseApps: FirebaseAppConfig[] = [
   {
-    id: 'safeplate',
-    name: 'SafePlate',
+    id: 'PantryPal',
+    name: 'PantryPal',
     logoUrl: 'https://picsum.photos/seed/safeplate/200/200',
-    appUrl: 'https://safeplate.example.com', // Example external URL
+    appUrl: 'https://pantrypal-budwm.web.app', // Example external URL
     description: 'Manage food safety protocols and ensure compliance with industry standards.',
     dataAiHint: 'food safety',
   },
-  {
+  /* {
     id: 'firejournal',
     name: 'FireJournal',
     logoUrl: 'https://picsum.photos/seed/firejournal/200/200',
@@ -31,6 +31,6 @@ export const firebaseApps: FirebaseAppConfig[] = [
     appUrl: 'https://cloudcanvas.example.com',
     description: 'Collaborative digital whiteboard for teams and individuals.',
     dataAiHint: 'drawing board',
-  },
+  }, */
   // Add more Firebase apps here as needed
 ];

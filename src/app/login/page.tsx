@@ -6,10 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChromeIcon } from 'lucide-react'; // Using ChromeIcon as a generic browser/Google icon
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 export default function LoginPage() {
-  const { signInWithGoogle, user, loading } = useAuth();
+  const [error, setError] = useState<string | null>(null);
+  const { signInWithGoogle, handleAuthentication, user, email, password, setEmail, setPassword, isLoginMode, setIsLoginMode,loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -44,7 +47,48 @@ export default function LoginPage() {
             Sign in to access your Firebase Zephyr dashboard.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent>
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="m@example.com"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+            {error && <p className="text-red-500 text-sm">{error}</p>}
+            <Button className="w-full" onClick={handleAuthentication}>
+              {isLoginMode ? 'Sign In' : 'Sign Up'}
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setIsLoginMode(!isLoginMode)}>
+              Switch to {isLoginMode ? 'Sign Up' : 'Sign In'}
+            </Button>
+            <Button
+              variant="outline"
+                          className="w-full"
+            onClick={signInWithGoogle}>
+                          Sign in with Google
+            </Button>
+          </div>
+        </CardContent>
+        {/* <CardContent className="space-y-6">
           <Button
             onClick={signInWithGoogle}
             className="w-full text-base py-6"
@@ -55,7 +99,7 @@ export default function LoginPage() {
             Sign in with Google
           </Button>
           {loading && <p className="text-center text-sm text-muted-foreground">Connecting...</p>}
-        </CardContent>
+        </CardContent> */}
       </Card>
     </div>
   );

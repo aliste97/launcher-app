@@ -17,7 +17,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4 # Or v3
         with:
-          node-version: '18' # Specify your Node.js version
+          node-version: '20.11.1' # Specify your Node.js version
 
       # (Optional) Install dependencies and build your project
       # Adjust these commands based on your project (npm, yarn, etc.)
