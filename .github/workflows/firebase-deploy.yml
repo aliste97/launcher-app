@@ -1,0 +1,42 @@
+name: Deploy to Firebase Hosting on merge
+
+on:
+  push:
+    branches:
+      - master 
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4 # Or v3
+
+      # (Optional) Setup Node.js if your project needs a build step
+      # If you have a static HTML/CSS/JS site without a build step, you can skip Node.js setup and build commands.
+      - name: Setup Node.js
+        uses: actions/setup-node@v4 # Or v3
+        with:
+          node-version: '18' # Specify your Node.js version
+
+      # (Optional) Install dependencies and build your project
+      # Adjust these commands based on your project (npm, yarn, etc.)
+      - name: Install Dependencies
+        run: npm ci # 'npm install' or 'yarn install'
+        # if: steps.cache-node-modules.outputs.cache-hit != 'true' # Example: Only run if cache miss
+
+      - name: Build Project
+        run: npm run build # Or 'yarn build', or your specific build command
+        # This step assumes your build output goes to the directory specified
+        # as 'public' in your firebase.json (e.g., 'dist', 'build', 'public')
+
+      # Deploy to Firebase Hosting
+      - name: Deploy to Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0 # Use the latest version
+        with:
+          repoToken: '${{ secrets.GITHUB_TOKEN }}' # Automatically provided by GitHub
+          firebaseServiceAccount: '${{ secrets.FIREBASE_TOKEN }}' # Your CI token
+          channelId: live # Deploy to the 'live' channel (production)
+          projectId: '${{ secrets.FIREBASE_PROJECT_ID }}' # Your Firebase project ID
+        # Optional: If your firebase.json is not in the root, specify its path:
+        # workingDirectory: './path/to/your/app'
