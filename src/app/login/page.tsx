@@ -11,8 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 export default function LoginPage() {
-  const [error, setError] = useState<string | null>(null);
-  const { signInWithGoogle, handleAuthentication, user, email, password, setEmail, setPassword, isLoginMode, setIsLoginMode,loading } = useAuth();
+  const { signInWithGoogle, handleAuthentication, user, email, password, setEmail, setPassword, isLoginMode, setIsLoginMode, signInError, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -44,7 +43,7 @@ export default function LoginPage() {
         <CardHeader className="text-center">
           <CardTitle className="text-3xl font-bold text-primary">Welcome Back!</CardTitle>
           <CardDescription className="text-muted-foreground">
-            Sign in to access your Firebase Zephyr dashboard.
+            Sign in to access your Wise Launcher dashboard.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -70,7 +69,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
-            {error && <p className="text-red-500 text-sm">{error}</p>}
+            {signInError && <p className="text-red-500 text-sm">{signInError}</p>}
             <Button className="w-full" onClick={handleAuthentication}>
               {isLoginMode ? 'Sign In' : 'Sign Up'}
             </Button>

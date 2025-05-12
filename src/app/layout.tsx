@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Firebase Zephyr',
-  description: 'A launcher for your Firebase applications.',
+  title: 'Wise Launcher',
+  description: 'A launcher for your applications.',
 };
 
 export default function RootLayout({

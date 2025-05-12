@@ -11,6 +11,7 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   images: {
+    unoptimized: true, // TOFIX: error with output: 'export'
     remotePatterns: [
       {
         protocol: 'https',

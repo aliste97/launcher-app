@@ -70,11 +70,11 @@ export default function HomePage() {
           <div className="flex items-center justify-center mb-4">
             <Sparkles className="h-12 w-12 text-primary mr-3" />
             <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent">
-              Firebase Zephyr
+              Wise Launcher
             </h1>
           </div>
           <p className="mt-3 text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto">
-            Welcome, {user.displayName || user.email}! Launch your Firebase applications.
+            Welcome, {user.displayName || user.email}! Launch your applications.
           </p>
           <Button onClick={signOutUser} variant="outline" className="mt-6">
             <LogOut className="mr-2 h-4 w-4" /> Logout
@@ -103,7 +103,7 @@ export default function HomePage() {
 
       <footer className="text-center py-8 border-t border-border/80 mt-12">
         <p className="text-sm text-muted-foreground">
-          &copy; {new Date().getFullYear()} Firebase Zephyr. Crafted with ❤️.
+          &copy; {new Date().getFullYear()} Wise Launcher. Crafted with ❤️.
         </p>
       </footer>
     </div>
