@@ -1,47 +1,45 @@
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'; // Added CardDescription
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { ShoppingBasket, PlusCircle, Trash2, Loader2, X, Minus, Plus, Inbox, ArrowLeft } from 'lucide-react'; // Added Minus, Plus, Inbox, ArrowLeft
+import { ShoppingBasket, PlusCircle, Trash2, Loader2, X, Minus, Plus, Inbox, ArrowLeft, Building } from 'lucide-react'; // Added Building for supermarket icon
 import { useAuthState } from 'react-firebase-hooks/auth';
 import {
   collection,
   getDocs,
-  orderBy,
-  query,
   addDoc,
   deleteDoc,
   doc,
   updateDoc
 } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase/config'; // Corrected import path
-import type { ShoppingItem } from '../../../types'; // Ensure correct path if needed
-import Link from 'next/link'; // Import Link for navigation
+import { auth, db } from '@/lib/firebase/config';
+import type { ShoppingItem } from '../../../types';
+import Link from 'next/link';
 
 const WisePantryApp: React.FC = () => {
   const [items, setItems] = useState<ShoppingItem[]>([]);
   const [newItemName, setNewItemName] = useState('');
   const [newItemQuantity, setNewItemQuantity] = useState<string>('1');
+  const [newItemSupermarket, setNewItemSupermarket] = useState(''); // State for new item's supermarket
   const [mounted, setMounted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [user, loadingUser] = useAuthState(auth!); // Get the current user
+  const [user, loadingUser] = useAuthState(auth!);
 
   const { toast } = useToast();
 
   useEffect(() => {
-    setMounted(true); // Set mounted immediately for client-side rendering logic
+    setMounted(true);
   }, []);
 
   useEffect(() => {
-    if (!mounted || loadingUser) return; // Wait for mount and auth state
+    if (!mounted || loadingUser) return;
     if (!user) {
-       setIsLoading(false); // Not logged in, stop loading
-       setItems([]); // Clear items if user logs out
+       setIsLoading(false);
+       setItems([]);
        return;
     }
 
@@ -52,10 +50,20 @@ const WisePantryApp: React.FC = () => {
           throw new Error("Firestore is not initialized.");
         }
         const itemsCollectionRef = collection(db, 'users', user.uid, 'shoppingItems');
-        const q = query(itemsCollectionRef, orderBy("name"));
-        const querySnapshot = await getDocs(q);
+        // Fetch without server-side ordering to avoid needing a composite index.
+        const querySnapshot = await getDocs(itemsCollectionRef);
         const fetchedItems = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ShoppingItem));
-        setItems(fetchedItems);
+
+        // Sort on the client side to group by supermarket and then by name.
+        const sortedItems = fetchedItems.sort((a, b) => {
+          const marketA = a.supermarket || 'General';
+          const marketB = b.supermarket || 'General';
+          const marketCompare = marketA.localeCompare(marketB);
+          if (marketCompare !== 0) return marketCompare;
+          return a.name.localeCompare(b.name);
+        });
+        
+        setItems(sortedItems);
       } catch (error) {
         console.error("Error fetching shopping items: ", error);
         toast({ title: "Error", description: "Could not fetch shopping items.", variant: "destructive" });
@@ -65,31 +73,39 @@ const WisePantryApp: React.FC = () => {
     };
 
     fetchShoppingItems();
-  }, [mounted, user, loadingUser, toast]); // Add loadingUser to dependencies
+  }, [mounted, user, loadingUser, toast]);
 
   const handleAddItem = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault(); // Make sure this is the VERY FIRST line
-    if (!user || !db) return; // Ensure user is logged in and db is initialized
+    e.preventDefault();
+    if (!user || !db) return;
 
     const quantity = parseInt(newItemQuantity, 10);
     if (!newItemName.trim() || isNaN(quantity) || quantity <= 0) {
       toast({ title: "Invalid Input", description: "Please enter a valid item name and a quantity greater than 0.", variant: "destructive" });
       return;
     }
-    const newItemData = { // Data without ID for Firestore
+    const supermarketValue = newItemSupermarket.trim() || 'General'; // Default to 'General' if empty
+
+    const newItemData = {
       name: newItemName.trim(),
       quantity,
       purchased: false,
+      supermarket: supermarketValue,
     };
 
     try {
       const docRef = await addDoc(collection(db, 'users', user.uid, 'shoppingItems'), newItemData);
       const newItemWithId: ShoppingItem = { id: docRef.id, ...newItemData };
-      // Add to local state and sort
-      setItems(prevItems => [...prevItems, newItemWithId].sort((a, b) => a.name.localeCompare(b.name)));
+      // Add to local state and sort (global sort is fine, grouping handles sections)
+      setItems(prevItems => [...prevItems, newItemWithId].sort((a, b) => {
+        const marketCompare = (a.supermarket || 'General').localeCompare(b.supermarket || 'General');
+        if (marketCompare !== 0) return marketCompare;
+        return a.name.localeCompare(b.name);
+      }));
       setNewItemName('');
       setNewItemQuantity('1');
-      toast({ title: "Item Added", description: `${newItemData.name} added to your list.` });
+      setNewItemSupermarket(''); // Clear supermarket input
+      toast({ title: "Item Added", description: `${newItemData.name} added to ${supermarketValue} list.` });
     } catch (error) {
       console.error("[WisePantryApp] Error adding item to Firestore: ", error);
       toast({ title: "Error", description: "Could not add item.", variant: "destructive" });
@@ -97,7 +113,7 @@ const WisePantryApp: React.FC = () => {
   };
 
   const handleTogglePurchased = async (id: string) => {
-    if (!user || !db) return; // Ensure user is logged in and db is initialized
+    if (!user || !db) return;
     const item = items.find(i => i.id === id);
     if (!item) return;
 
@@ -117,7 +133,7 @@ const WisePantryApp: React.FC = () => {
   };
 
   const handleDeleteItem = async (id: string) => {
-    if (!user || !db) return; // Ensure user is logged in and db is initialized
+    if (!user || !db) return;
     const itemToDelete = items.find(item => item.id === id);
     if (!itemToDelete) return;
 
@@ -133,15 +149,13 @@ const WisePantryApp: React.FC = () => {
   };
 
   const handleQuantityChange = async (id: string, change: number) => {
-    if (!user || !db) return; // Ensure user is logged in and db is initialized
+    if (!user || !db) return;
     const item = items.find(i => i.id === id);
     if (!item) return;
 
     const newQuantity = item.quantity + change;
     if (newQuantity < 1) {
-        // Optionally show a toast or simply do nothing
-        // toast({ title: "Info", description: "Quantity cannot be less than 1.", variant: "default" });
-        return; // Prevent quantity from going below 1
+        return;
     }
 
     const itemRef = doc(db, 'users', user.uid, 'shoppingItems', id);
@@ -158,9 +172,20 @@ const WisePantryApp: React.FC = () => {
     }
   };
 
-  if (!mounted || loadingUser || (isLoading && user)) { // Show loader while loading auth state OR loading items when user is known
+  // Group items by supermarket
+  const itemsBySupermarket = items.reduce((acc, item) => {
+    const market = item.supermarket || 'General'; // Default for items without a supermarket
+    if (!acc[market]) {
+      acc[market] = [];
+    }
+    acc[market].push(item);
+    return acc;
+  }, {} as Record<string, ShoppingItem[]>);
+
+
+  if (!mounted || loadingUser || (isLoading && user)) {
     return (
-      <div className="flex justify-center items-center min-h-[calc(100vh-200px)]"> {/* Adjusted min height */}
+      <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
       </div>
     );
@@ -172,11 +197,9 @@ const WisePantryApp: React.FC = () => {
          <ShoppingBasket size={64} className="mx-auto mb-4 text-primary opacity-50" />
          <h1 className="text-3xl font-bold mb-4 text-muted-foreground">Welcome to WisePantry</h1>
          <p className="text-lg text-muted-foreground">Please log in to manage your shopping list.</p>
-         {/* Optionally add a login button here if needed */}
       </div>
     )
   }
-
 
   return (
     <div className="container mx-auto p-4 sm:p-6 md:p-8 max-w-3xl bg-gradient-to-br from-background via-background to-muted/30 min-h-screen">
@@ -197,11 +220,11 @@ const WisePantryApp: React.FC = () => {
       <Card className="mb-8 shadow-xl rounded-xl border border-border/50 bg-card/90 backdrop-blur-md">
         <CardHeader>
           <CardTitle className="text-xl sm:text-2xl text-primary font-semibold">Add New Item</CardTitle>
-          <CardDescription>Enter the name and quantity of the item you need.</CardDescription>
+          <CardDescription>Enter item details. A new supermarket section will be created if it doesn't exist.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleAddItem} className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-4 items-end">
-            <div className="flex-grow">
+          <form onSubmit={handleAddItem} className="space-y-4">
+            <div>
               <label htmlFor="itemName" className="block text-sm font-medium text-muted-foreground mb-1.5">Item Name</label>
               <Input
                 id="itemName"
@@ -213,21 +236,34 @@ const WisePantryApp: React.FC = () => {
                 className="w-full text-base sm:text-md py-2.5 px-4 rounded-lg shadow-sm focus:ring-primary focus:border-primary"
               />
             </div>
-            <div className="w-full sm:w-28">
-              <label htmlFor="itemQuantity" className="block text-sm font-medium text-muted-foreground mb-1.5">Quantity</label>
+            <div>
+              <label htmlFor="itemSupermarket" className="block text-sm font-medium text-muted-foreground mb-1.5">Supermarket (optional)</label>
               <Input
-                id="itemQuantity"
-                type="number"
-                value={newItemQuantity}
-                onChange={(e) => setNewItemQuantity(e.target.value)}
-                min="1"
-                required
+                id="itemSupermarket"
+                type="text"
+                value={newItemSupermarket}
+                onChange={(e) => setNewItemSupermarket(e.target.value)}
+                placeholder="e.g., Trader Joe's, Costco (defaults to 'General')"
                 className="w-full text-base sm:text-md py-2.5 px-4 rounded-lg shadow-sm focus:ring-primary focus:border-primary"
               />
             </div>
-            <Button type="submit" className="w-full sm:w-auto whitespace-nowrap text-base sm:text-md py-3 sm:py-2.5 px-6 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300">
-              <PlusCircle size={18} className="mr-2" /> Add Item
-            </Button>
+            <div className="flex gap-4 items-end">
+              <div className="w-full sm:w-28">
+                <label htmlFor="itemQuantity" className="block text-sm font-medium text-muted-foreground mb-1.5">Quantity</label>
+                <Input
+                  id="itemQuantity"
+                  type="number"
+                  value={newItemQuantity}
+                  onChange={(e) => setNewItemQuantity(e.target.value)}
+                  min="1"
+                  required
+                  className="w-full text-base sm:text-md py-2.5 px-4 rounded-lg shadow-sm focus:ring-primary focus:border-primary"
+                />
+              </div>
+              <Button type="submit" className="flex-grow sm:flex-grow-0 whitespace-nowrap text-base sm:text-md py-3 sm:py-2.5 px-6 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300">
+                <PlusCircle size={18} className="mr-2" /> Add Item
+              </Button>
+            </div>
           </form>
         </CardContent>
       </Card>
@@ -235,84 +271,98 @@ const WisePantryApp: React.FC = () => {
       {/* Shopping List Section */}
       <Card className="shadow-xl rounded-xl border border-border/30 bg-card/95 backdrop-blur-md">
         <CardHeader>
-          <CardTitle className="text-xl sm:text-2xl text-primary font-semibold">My Shopping List</CardTitle>
-          <CardDescription>Items you need to buy. Click an item to mark it as purchased.</CardDescription>
+          <CardTitle className="text-xl sm:text-2xl text-primary font-semibold">My Shopping Lists</CardTitle>
+          <CardDescription>Items you need to buy, organized by supermarket. Click an item to mark it as purchased.</CardDescription>
         </CardHeader>
         <CardContent>
           {items.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
                <Inbox size={56} className="mx-auto mb-6 opacity-40"/>
-              <p className="text-xl font-semibold mb-2">Your list is refreshingly empty!</p>
+              <p className="text-xl font-semibold mb-2">Your lists are refreshingly empty!</p>
               <p className="text-md max-w-xs mx-auto">Use the form above to add items and get your shopping organized.</p>
             </div>
           ) : (
-            <ul className="space-y-3.5">
-              {items.map(item => (
-                <li
-                  key={item.id}
-                  className={`flex items-center gap-4 p-4 rounded-xl transition-all duration-300 ease-in-out border cursor-pointer group ${
-                    item.purchased
-                      ? 'bg-muted/70 border-transparent opacity-60 hover:opacity-80'
-                      : 'bg-card hover:bg-secondary/30 border-border/40 hover:border-primary/50 hover:shadow-lg'
-                  }`}
-                  onClick={() => handleTogglePurchased(item.id)}
-                >
-                  <Checkbox
-                    id={`item-${item.id}`}
-                    checked={item.purchased}
-                    onCheckedChange={(checked) => {
-                        // Prevent click propagation to li if interacting directly with checkbox
-                        // but since we want the whole li to be clickable, this is fine.
-                    }}
-                    aria-label={`Mark ${item.name} as ${item.purchased ? 'not purchased' : 'purchased'}`}
-                    className={`transform scale-110 transition-transform duration-200 ${item.purchased ? 'border-transparent' : 'border-primary/50 group-hover:border-primary'}`}
-                  />
-                  <div className="flex-grow">
-                    <span
-                      className={`text-md font-medium transition-colors ${
-                        item.purchased ? 'line-through text-muted-foreground' : 'text-foreground group-hover:text-primary'
-                      }`}
-                    >
-                      {item.name}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => { e.stopPropagation(); handleQuantityChange(item.id, -1); }}
-                        className={`h-8 w-8 rounded-full transition-all duration-200 ${item.quantity <= 1 || item.purchased ? 'opacity-40 cursor-not-allowed text-muted-foreground' : 'hover:bg-destructive/10 text-destructive hover:scale-110'}`}
-                        aria-label="Decrease quantity"
-                        disabled={item.quantity <= 1 || item.purchased}
-                      >
-                          <Minus size={16} />
-                      </Button>
-                    <span className={`w-10 text-center px-2 py-1 text-sm font-semibold rounded-md tabular-nums ${item.purchased ? 'text-muted-foreground bg-transparent' : 'bg-primary/10 text-primary group-hover:bg-primary/20'}`}>
-                      {item.quantity}
-                    </span>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => { e.stopPropagation(); handleQuantityChange(item.id, 1); }}
-                        className={`h-8 w-8 rounded-full transition-all duration-200 ${item.purchased ? 'opacity-40 cursor-not-allowed pointer-events-none text-muted-foreground' : 'hover:bg-primary/10 text-primary hover:scale-110'}`}
-                        aria-label="Increase quantity"
-                        disabled={item.purchased}
-                      >
-                          <Plus size={16} />
-                      </Button>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={(e) => { e.stopPropagation(); handleDeleteItem(item.id); }}
-                    className={`h-9 w-9 ml-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full transition-all duration-200 hover:scale-110 ${item.purchased ? 'opacity-50' : 'group-hover:opacity-100'}`}
-                    aria-label={`Delete ${item.name}`}
-                  >
-                    <Trash2 size={18} />
-                  </Button>
-                </li>
+            <div className="space-y-6">
+              {Object.entries(itemsBySupermarket).map(([supermarket, marketItems]) => (
+                <Card key={supermarket} className="shadow-md rounded-lg border border-border/40 bg-card/80">
+                  <CardHeader className="pb-3 pt-4 px-4 bg-secondary/20 rounded-t-lg">
+                    <CardTitle className="text-lg flex items-center text-accent font-medium">
+                      <Building size={20} className="mr-2 text-accent/70" />
+                      {supermarket}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4">
+                    {marketItems.length === 0 ? (
+                       <p className="text-sm text-muted-foreground">No items for {supermarket}.</p>
+                    ) : (
+                      <ul className="space-y-3">
+                        {marketItems.map(item => (
+                          <li
+                            key={item.id}
+                            className={`flex items-center gap-3 p-3.5 rounded-lg transition-all duration-300 ease-in-out border cursor-pointer group ${
+                              item.purchased
+                                ? 'bg-muted/60 border-transparent opacity-60 hover:opacity-75'
+                                : 'bg-card hover:bg-secondary/20 border-border/30 hover:border-primary/40 hover:shadow-md'
+                            }`}
+                            onClick={() => handleTogglePurchased(item.id)}
+                          >
+                            <Checkbox
+                              id={`item-${item.id}`}
+                              checked={item.purchased}
+                              aria-label={`Mark ${item.name} as ${item.purchased ? 'not purchased' : 'purchased'}`}
+                              className={`transform scale-105 transition-transform duration-200 ${item.purchased ? 'border-transparent' : 'border-primary/50 group-hover:border-primary'}`}
+                            />
+                            <div className="flex-grow">
+                              <span
+                                className={`text-md font-medium transition-colors ${
+                                  item.purchased ? 'line-through text-muted-foreground' : 'text-foreground group-hover:text-primary'
+                                }`}
+                              >
+                                {item.name}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => { e.stopPropagation(); handleQuantityChange(item.id, -1); }}
+                                  className={`h-7 w-7 rounded-full transition-all duration-200 ${item.quantity <= 1 || item.purchased ? 'opacity-30 cursor-not-allowed text-muted-foreground' : 'hover:bg-destructive/10 text-destructive hover:scale-105'}`}
+                                  aria-label="Decrease quantity"
+                                  disabled={item.quantity <= 1 || item.purchased}
+                                >
+                                    <Minus size={14} />
+                                </Button>
+                              <span className={`w-9 text-center px-1.5 py-0.5 text-xs font-semibold rounded-md tabular-nums ${item.purchased ? 'text-muted-foreground bg-transparent' : 'bg-primary/10 text-primary group-hover:bg-primary/15'}`}>
+                                {item.quantity}
+                              </span>
+                              <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => { e.stopPropagation(); handleQuantityChange(item.id, 1); }}
+                                  className={`h-7 w-7 rounded-full transition-all duration-200 ${item.purchased ? 'opacity-30 cursor-not-allowed pointer-events-none text-muted-foreground' : 'hover:bg-primary/10 text-primary hover:scale-105'}`}
+                                  aria-label="Increase quantity"
+                                  disabled={item.purchased}
+                                >
+                                    <Plus size={14} />
+                                </Button>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => { e.stopPropagation(); handleDeleteItem(item.id); }}
+                              className={`h-8 w-8 ml-0.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full transition-all duration-200 hover:scale-105 ${item.purchased ? 'opacity-40' : 'group-hover:opacity-90'}`}
+                              aria-label={`Delete ${item.name}`}
+                            >
+                              <Trash2 size={16} />
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </CardContent>
+                </Card>
               ))}
-            </ul>
+            </div>
           )}
         </CardContent>
       </Card>
